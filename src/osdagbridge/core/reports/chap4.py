@@ -5,7 +5,7 @@ from osdagbridge.core.utils.common import (
     KEY_SD_DEFL_LIVE,
     KEY_SD_DEFL_TOTAL,
 )
-from osdagbridge.core.reports.report_utils import _tex, _fig_embed
+from osdagbridge.core.reports.report_utils import _tex, _format_lc, _fig_embed
 
 if TYPE_CHECKING:
     from .report_generator import ReportDataBridge
@@ -31,7 +31,7 @@ def ch4_analysis(asum, fig_paths, bridge: "ReportDataBridge", span_m: float):
         bm_d  = bm_d  or {}
         rxn_d = rxn_d or {}
         return (
-            _tex(lc)                              + r" & "
+            _format_lc(lc)                        + r" & "
             + _fmt(bm_d.get('max_bm'))           + r" & "
             + _tex(bm_d.get('bm_girder', '---')) + r" & "
             + _fmt(bm_d.get('bm_location'))      + r" & "
@@ -82,7 +82,7 @@ def ch4_analysis(asum, fig_paths, bridge: "ReportDataBridge", span_m: float):
             l_val = _fmt(rdata.get('left_kN'))
             r_val = _fmt(rdata.get('right_kN'))
             if l_val != "---" or r_val != "---":
-                rxn_rows.append(f"{_tex(lc)} & {l_val} & {r_val} \\\\[6pt]\n\\hline")
+                rxn_rows.append(f"{_format_lc(lc)} & {l_val} & {r_val} \\\\[6pt]\n\\hline")
 
     if rxn_rows:
         rxn_table_tex = r"""

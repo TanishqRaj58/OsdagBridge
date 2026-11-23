@@ -114,7 +114,7 @@ def ch3_loads(input_dict):
             impact_factor_str = "---"
 
     lanes = input_dict.get(KEY_WC_LD_LANE_TABLE_COUNT)
-    braking_val_str = "---"
+    braking_val_str = "N/A"
     if lanes not in (None, ""):
         try:
             lanes_int = int(lanes)
@@ -122,7 +122,7 @@ def ch3_loads(input_dict):
             braking_force_kN = braking_force_t * 9.81
             braking_val_str = f"{braking_force_kN:.2f} ({braking_force_t:.2f} t)"
         except Exception:
-            braking_val_str = "---"
+            braking_val_str = "N/A"
 
     centrifugal_val_str = "0.00 (Straight Bridge)"
 
@@ -295,7 +295,7 @@ def ch3_loads(input_dict):
 
     t_veh_body = (
         r"\textnormal{Selected Vehicle Class(es)} & " + _tex(vehicles_str) + r" & --- \\[6pt]" + "\n\\hline\n"
-        r"\textnormal{Design Traffic Lanes} & " + (_tex(lanes) if lanes not in (None, "") else "---") + r" & Nos. \\[6pt]" + "\n\\hline\n"
+        r"\textnormal{Design Traffic Lanes} & " + (_tex(lanes) if lanes not in (None, "") else "N/A") + r" & Nos. \\[6pt]" + "\n\\hline\n"
         r"\textnormal{Impact Factor (1 + IF, IRC 6 Cl. 208)} & " + _tex(impact_factor_str) + r" & --- \\[6pt]" + "\n\\hline\n"
         r"\textnormal{Longitudinal Braking Load (IRC 6 Cl. 211.2)} & " + _tex(braking_val_str) + r" & kN \\[6pt]" + "\n\\hline\n"
         r"\textnormal{Centrifugal Force (IRC 6 Cl. 212)} & " + _tex(centrifugal_val_str) + r" & kN \\[6pt]"
@@ -327,9 +327,9 @@ def ch3_loads(input_dict):
         r"\textnormal{Average Exposed Height, H} & " + _render_value(input_dict, KEY_WL_AVG_EXPOSED_HEIGHT) + r" & m \\[6pt]" + "\n\\hline\n"
         r"\textnormal{Hourly Mean Wind Speed, Vz} & " + (_tex(f"{float(vz_val):.2f}") if vz_val not in (None, "") else "---") + r" & m/s \\[6pt]" + "\n\\hline\n"
         r"\textnormal{Hourly Wind Pressure, Pz} & " + (_tex(f"{float(pz_val):.2f}") if pz_val not in (None, "") else "---") + r" & N/m\textsuperscript{2} \\[6pt]" + "\n\\hline\n"
-        r"\textnormal{Transverse Wind Force} & " + _render_value(input_dict, KEY_WL_TRANSVERSE_WIND_FORCE) + r" & kN \\[6pt]" + "\n\\hline\n"
-        r"\textnormal{Longitudinal Wind Force} & " + _render_value(input_dict, KEY_WL_LONGITUDINAL_WIND_FORCE) + r" & kN \\[6pt]" + "\n\\hline\n"
-        r"\textnormal{Vertical Wind Force} & " + _render_value(input_dict, KEY_WL_VERTICAL_WIND_FORCE) + r" & kN \\[6pt]"
+        r"\textnormal{Transverse Wind Force} & " + (_render_value(input_dict, KEY_WL_TRANSVERSE_WIND_FORCE) if input_dict.get(KEY_WL_TRANSVERSE_WIND_FORCE) not in (None, "") else "N/A") + r" & kN \\[6pt]" + "\n\\hline\n"
+        r"\textnormal{Longitudinal Wind Force} & " + (_render_value(input_dict, KEY_WL_LONGITUDINAL_WIND_FORCE) if input_dict.get(KEY_WL_LONGITUDINAL_WIND_FORCE) not in (None, "") else "N/A") + r" & kN \\[6pt]" + "\n\\hline\n"
+        r"\textnormal{Vertical Wind Force} & " + (_render_value(input_dict, KEY_WL_VERTICAL_WIND_FORCE) if input_dict.get(KEY_WL_VERTICAL_WIND_FORCE) not in (None, "") else "N/A") + r" & kN \\[6pt]"
     )
     t_wl = make_longtable(
         "|L{6.0cm}|C{6.5cm}|C{3.0cm}|",
@@ -347,8 +347,8 @@ def ch3_loads(input_dict):
         r"\textnormal{Spectral Acceleration Coeff., Sa/g} & " + (_tex(f"{float(sl_spectral):.4f}") if sl_spectral not in (None, "") else "---") + r" & --- \\[6pt]" + "\n\\hline\n"
         r"\textnormal{Horizontal Seismic Coefficient, Ah} & " + (_tex(f"{float(sl_ah):.6f}") if sl_ah not in (None, "") else "---") + r" & --- \\[6pt]" + "\n\\hline\n"
         r"\textnormal{Vertical Seismic Coefficient, Av} & " + (_tex(f"{float(sl_av):.6f}") if sl_av not in (None, "") else "---") + r" & --- \\[6pt]" + "\n\\hline\n"
-        r"\textnormal{Horizontal Seismic Force (Longitudinal)} & --- & kN \\[6pt]" + "\n\\hline\n"
-        r"\textnormal{Horizontal Seismic Force (Transverse)} & --- & kN \\[6pt]"
+        r"\textnormal{Horizontal Seismic Force (Longitudinal)} & N/A & kN \\[6pt]" + "\n\\hline\n"
+        r"\textnormal{Horizontal Seismic Force (Transverse)} & N/A & kN \\[6pt]"
     )
     t_el = make_longtable(
         "|L{6.0cm}|C{6.5cm}|C{3.0cm}|",

@@ -134,7 +134,7 @@ This section documents all inputs provided to OsdagBridge. User-provided inputs 
 \hline
 \textnormal{Footpath} & """ + (_render_value(input_dict, KEY_FOOTPATH)) + r""" \\
 \hline
-\textnormal{Skew Angle (degrees)} & """ + (_render_value(input_dict, KEY_SKEW_ANGLE, '°')) + r""" (IRC 24 Cl. 504.8 limit: $\pm$15°) \\
+\textnormal{Skew Angle (degrees)} & """ + ("N/A" if input_dict.get(KEY_SKEW_ANGLE) in ("", None) else (_render_value(input_dict, KEY_SKEW_ANGLE, '°') + r""" (IRC 24 Cl. 504.8 limit: $\pm$15°)""")) + r""" \\
 \hline
 \end{tabular}
 \end{table}
@@ -184,7 +184,7 @@ Where the user has modified additional inputs, those values are reported here. W
 \hline
 \textnormal{Footpath Width (m)} & """ + (_render_value(input_dict, KEY_TS_FOOTPATH_WIDTH, ' m')) + r""" (IRC 5 Cl. 104.3.6 min: 1.5 m) \\[6pt]
 \hline
-\textnormal{No. of Traffic Lanes} & """ + (_render_value(input_dict, KEY_WC_LD_LANE_TABLE_COUNT)) + r""" (per IRC 5 Cl. 104.3.1) \\[6pt]
+\textnormal{No. of Traffic Lanes} & """ + ("N/A" if input_dict.get(KEY_WC_LD_LANE_TABLE_COUNT) in ("", None) else (_render_value(input_dict, KEY_WC_LD_LANE_TABLE_COUNT) + r""" (per IRC 5 Cl. 104.3.1)""")) + r""" \\[6pt]
 \hline
 \end{longtable}
 

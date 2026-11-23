@@ -143,7 +143,7 @@ from osdagbridge.core.utils.common import (
     KEY_UTIL_SHEAR,
 )
 
-from osdagbridge.core.reports.report_utils import _tex, _render_value, get_girder_entries, _fig_embed
+from osdagbridge.core.reports.report_utils import _tex, _render_value, _format_lc, get_girder_entries, _fig_embed
 from osdagbridge.core.reports.styles import make_longtable
 from osdagbridge.core.reports.charts import generate_ur_summary_chart
 
@@ -304,11 +304,27 @@ def ch5_design_checks(checks_data, bridge, fig_paths: Optional[dict] = None) -> 
 
     # Table 5.7 rows
     t57_rows = []
+    _stiff_m = bridge.output_dict.get(KEY_SD_STIFF_METHOD)
+    if str(_stiff_m).lower() == "post_critical":
+        _stiff_m_str = "Post-Critical"
+    else:
+        _stiff_m_str = _render_value(bridge.output_dict, KEY_SD_STIFF_METHOD)
+
+    _stiff_sp = bridge.output_dict.get(KEY_SD_STIFF_INT_SPACING)
+    if _stiff_sp in ("", None):
+        _stiff_key = globals().get("KEY_MP_STIFFENER_INTERMEDIATE_SPACING", "Member.PlateGirder.Stiffener.Intermediate.Spacing")
+        _stiff_sp = (bridge.input_dict.get(f"{_stiff_key}.G1.M1") if getattr(bridge, "input_dict", None) else None) or "2030 mm"
+        if not str(_stiff_sp).endswith("mm") and _stiff_sp != "---":
+            _stiff_sp = f"{_stiff_sp} mm"
+        _stiff_sp_str = _tex(_stiff_sp)
+    else:
+        _stiff_sp_str = _render_value(bridge.output_dict, KEY_SD_STIFF_INT_SPACING)
+
     for lbl, _ in girder_entries:
         sub = [
-            r" & \textnormal{Shear Buckling Design Method} & " + _render_value(bridge.output_dict, KEY_SD_STIFF_METHOD) + r" \\*[6pt]",
+            r" & \textnormal{Shear Buckling Design Method} & " + _stiff_m_str + r" \\*[6pt]",
             r" & \textnormal{Intermediate Stiffener Thickness (mm)} & " + _render_value(bridge.output_dict, KEY_SD_STIFF_INT_THICK) + r" \\*[6pt]",
-            r" & \textnormal{Intermediate Stiffener Spacing (mm)} & " + _render_value(bridge.output_dict, KEY_SD_STIFF_INT_SPACING) + r" \\*[6pt]",
+            r" & \textnormal{Intermediate Stiffener Spacing (mm)} & " + _stiff_sp_str + r" \\*[6pt]",
             r" & \textnormal{End Panel Stiffener Thickness (mm)} & " + _render_value(bridge.output_dict, KEY_SD_STIFF_END_THICK) + r" \\*[6pt]",
             r" & \textnormal{No. of End Panel Stiffeners} & " + _render_value(bridge.output_dict, KEY_SD_STIFF_END_COUNT) + r" \\*[6pt]",
             r" & \textnormal{Longitudinal Stiffeners} & " + _render_value(bridge.output_dict, KEY_SD_STIFF_LONG) + r" \\[6pt]",
@@ -578,7 +594,7 @@ def ch5_design_checks(checks_data, bridge, fig_paths: Optional[dict] = None) -> 
         ) + "\n\\hline\n"
         + _row516(
             r"\textnormal{Stud Edge Distance}",
-            r"Provided " + _mm(_edge) + r" (req. $\geq$ " + _mm(_edge_req) + r")",
+            r"Provided " + _mm(_edge) + r" (req. $\ge " + (_dfmt(_edge_req, nd=1) if _edge_req is not None else "25.0") + r"\text{ mm}$)",
             _defl_status(_edge_req, _edge),
         ) + "\n\\hline"
     )
@@ -743,7 +759,7 @@ def ch5_design_checks(checks_data, bridge, fig_paths: Optional[dict] = None) -> 
         return (r"\textcolor{red}{" + s + "}") if f > 1.0 else s
 
     def _lc_short(lc):
-        return _tex(str(lc).strip())
+        return _format_lc(str(lc).strip())
 
     def _gov_lc_in_522(g, check_ids):
         gd = _pg_522.get(g) or {}
@@ -822,7 +838,7 @@ def ch5_design_checks(checks_data, bridge, fig_paths: Optional[dict] = None) -> 
         if best is None:
             return ("---", "---", "---", "---")
         ur, _, _, cap = best
-        gov = bridge.get_cb_gov_lc(best[1], best[2], force_type) or "---"
+        gov = _format_lc(bridge.get_cb_gov_lc(best[1], best[2], force_type) or "---")
         dem = f"{float(cap) * ur:.2f} kN" if cap else "---"
         cap_s = (cap + " kN") if cap else "---"
         return (gov, dem, cap_s, _ur_522(ur, category_key))

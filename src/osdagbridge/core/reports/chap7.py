@@ -49,6 +49,15 @@ def ch7_quantities(input_dict, fig_paths: Optional[dict] = None) -> str:
             "bracing_diag_wt_total",
         ),
         (
+            "2(d)",
+            "End Diaphragms",
+            "end_diaphragm_vol_formula",
+            "end_diaphragm_qty",
+            "end_diaphragm_vol_total",
+            "end_diaphragm_wt_single",
+            "end_diaphragm_wt_total",
+        ),
+        (
             "3",
             "Concrete (M40) for Deck Slab",
             "concrete_deck_vol_formula",
@@ -87,16 +96,24 @@ def ch7_quantities(input_dict, fig_paths: Optional[dict] = None) -> str:
     ]
 
     def _cell(key):
+        if key == "end_diaphragm_wt_total":
+            raw = input_dict.get("end_diaphragm_wt_total") or input_dict.get("diaphragm_wt_total")
+            if raw in (None, ""):
+                return "0.00"
+            try:
+                return f"{float(raw):.2f}"
+            except (TypeError, ValueError):
+                return _tex(raw)
         raw = input_dict.get(key)
         if raw in (None, ""):
-            return "N.A."
+            return "N/A"
         return _tex(raw)
 
     def _formula_cell(key):
         """Return *_vol_formula values verbatim (they already contain LaTeX math)."""
         raw = input_dict.get(key)
         if raw in (None, ""):
-            return "N.A."
+            return "N/A"
         return str(raw)
 
     body_lines = []

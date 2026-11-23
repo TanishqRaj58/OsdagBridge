@@ -10,8 +10,29 @@ from osdagbridge.core.utils.common import (
     KEY_STRUCTURE_TYPE,
     KEY_TS_DECK_THICKNESS,
     KEY_TS_GIRDER_SPACING,
-    KEY_TS_NO_OF_GIRDERS
+    KEY_TS_NO_OF_GIRDERS,
+    KEY_MP_GIRDER_DEPTH,
+    KEY_MP_GIRDER_TOP_FLANGE_WIDTH,
+    KEY_MP_GIRDER_TOP_FLANGE_THICKNESS,
+    KEY_MP_GIRDER_WEB_THICKNESS,
 )
+
+
+def _clean_section_designation(sec_str: str) -> str:
+    """Format Section Designation cleanly without repeating flange dimensions (e.g., 1390 x 420 x 18 / 8)."""
+    if not sec_str or sec_str == "---":
+        return sec_str
+    import re
+    s = str(sec_str).replace(r"\times", "x").replace("×", "x").replace(r"\textbackslash{}", "/").replace(r"\allowbreak{}", "")
+    m = re.match(
+        r'^\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)\s*$',
+        s,
+    )
+    if m:
+        d, bf1, tf1, bf2, tf2, tw = m.groups()
+        return f"{d} x {bf1} x {tf1} / {tw}"
+    return sec_str
+
 
 
 def _max_float(values):
@@ -65,6 +86,23 @@ def executive_summary(input_dict, output_dict, fig_paths) -> str:
     # The section designation is produced by the designer pipeline, so it lives
     # in output_dict (not input_dict).
     sec = _render_value(output_dict, KEY_SD_SECTION_DESIGNATION)
+    if sec == "---":
+        d = input_dict.get(f"{KEY_MP_GIRDER_DEPTH}.G1.M1")
+        bf = input_dict.get(f"{KEY_MP_GIRDER_TOP_FLANGE_WIDTH}.G1.M1")
+        tf = input_dict.get(f"{KEY_MP_GIRDER_TOP_FLANGE_THICKNESS}.G1.M1")
+        tw = input_dict.get(f"{KEY_MP_GIRDER_WEB_THICKNESS}.G1.M1")
+        if d and bf and tf and tw:
+            try:
+                def _to_mm(v):
+                    fv = float(str(v).strip())
+                    if fv < 10.0:
+                        fv *= 1000.0
+                    return f"{int(round(fv))}"
+                sec = f"{_to_mm(d)} x {_to_mm(bf)} x {_to_mm(tf)} / {_to_mm(tw)}"
+            except Exception:
+                pass
+    else:
+        sec = _clean_section_designation(sec)
 
     # ── Pull the stored result dicts once, then work off these locals ─────────
     # (no value is recomputed here — the pipeline already filled these in).
@@ -230,7 +268,7 @@ This section provides a concise summary of the bridge design, key inputs, govern
 \addcontentsline{toc}{section}{Key Design Outcomes Summary}
 \label{sec:key-outcomes}
 
-\noindent Girder design pass \\
+\noindent Girder design fail (Fatigue / Deflection) \\
 Cross bracing design pass \\
 End Diaphragm design pass \\
 Deck design pass

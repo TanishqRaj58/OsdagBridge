@@ -38,6 +38,23 @@ def _render_value(source_dict, key, unit=""):
     return _tex(val) + unit
 
 
+def _format_lc(lc: str) -> str:
+    """Format load combo avoiding awkward mid-word breaks while allowing break at underscores."""
+    s = str(lc).strip() if lc is not None else ""
+    if not s or s == "---":
+        return "---"
+    parts = s.split("_")
+    escaped_parts = []
+    for p in parts:
+        esc_p = _tex(p)
+        if esc_p:
+            escaped_parts.append(r"\mbox{" + esc_p + r"}")
+        else:
+            escaped_parts.append("")
+    return r"\_\allowbreak{}".join(escaped_parts)
+
+
+
 def get_girder_entries(input_dict):
     """Retrieve all girder labels and member IDs from backend keys."""
     n = int(input_dict.get(KEY_TS_NO_OF_GIRDERS, 0) or 0)
