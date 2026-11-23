@@ -172,7 +172,7 @@ Where the user has modified additional inputs, those values are reported here. W
 \hline
 \textbf{parameter} & \textbf{value} \\
 \hline
-\textnormal{Overall Bridge Width (m)} & """ + (_render_value(input_dict, KEY_TS_OVERALL_WIDTH)) + r""" \\[6pt]
+\textnormal{Overall Bridge Width (m)} & """ + (lambda v: f"{float(v):.2f}" if v not in ("", None) else "---")(input_dict.get(KEY_TS_OVERALL_WIDTH, "")) + r""" \\[6pt]
 \hline
 \textnormal{No. of Girders} & """ + (_render_value(input_dict, KEY_TS_NO_OF_GIRDERS)) + r""" \\[6pt]
 \hline
@@ -237,20 +237,33 @@ def _girder_tables(input_dict, n_girders):
         )
     ]
 
+    # Helper: render girder dimension in mm (convert from meters if < 10)
+    def _render_dim_mm(key):
+        val = input_dict.get(key)
+        if val in ("", None):
+            return "---"
+        try:
+            f = float(str(val).strip())
+            if f < 10.0:
+                f = f * 1000.0
+            return f"{f:.1f} mm"
+        except (ValueError, TypeError):
+            return _tex(val) + " mm"
+
     # Helper: one girder-dimension row
     def _dim_row(g_lbl, i):
         return (g_lbl + r""" & """
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_DEPTH}.G{i}.M1", ' mm'))
+                + _render_dim_mm(f"{KEY_MP_GIRDER_DEPTH}.G{i}.M1")
                 + r""" & """
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_WEB_THICKNESS}.G{i}.M1", ' mm'))
+                + _render_dim_mm(f"{KEY_MP_GIRDER_WEB_THICKNESS}.G{i}.M1")
                 + r""" & """
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_TOP_FLANGE_WIDTH}.G{i}.M1", ' mm'))
+                + _render_dim_mm(f"{KEY_MP_GIRDER_TOP_FLANGE_WIDTH}.G{i}.M1")
                 + ', '
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_TOP_FLANGE_THICKNESS}.G{i}.M1", ' mm'))
+                + _render_dim_mm(f"{KEY_MP_GIRDER_TOP_FLANGE_THICKNESS}.G{i}.M1")
                 + r""" & """
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_BOTTOM_FLANGE_WIDTH}.G{i}.M1", ' mm'))
+                + _render_dim_mm(f"{KEY_MP_GIRDER_BOTTOM_FLANGE_WIDTH}.G{i}.M1")
                 + ', '
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_BOTTOM_FLANGE_THICKNESS}.G{i}.M1", ' mm'))
+                + _render_dim_mm(f"{KEY_MP_GIRDER_BOTTOM_FLANGE_THICKNESS}.G{i}.M1")
                 + r""" \\[8pt]
 \hline
 """)
@@ -317,10 +330,16 @@ def _girder_tables(input_dict, n_girders):
 
 \vspace{4pt}
 \begin{longtable}{|L{1.8cm}|L{2.3cm}|L{1.8cm}|p{4.8cm}|p{4.8cm}|}
-\caption{\textbf{Girder Section Dimensions}}
+\caption{\textbf{Girder Section Dimensions}} \\
 \hline
 \textbf{Girder} & \textbf{Total Depth, D (mm)} & \textbf{Web, $t_w$ (mm)} & \textbf{Top Flange (b\textsubscript{tf}, t\textsubscript{tf}) mm} & \textbf{Bottom Flange (b\textsubscript{bf}, t\textsubscript{bf}) mm} \\[6pt]
 \hline
+\endfirsthead
+\multicolumn{5}{l}{\small\textit{Girder Section Dimensions (continued)}} \\
+\hline
+\textbf{Girder} & \textbf{Total Depth, D (mm)} & \textbf{Web, $t_w$ (mm)} & \textbf{Top Flange (b\textsubscript{tf}, t\textsubscript{tf}) mm} & \textbf{Bottom Flange (b\textsubscript{bf}, t\textsubscript{bf}) mm} \\[6pt]
+\hline
+\endhead
 """
             + dim_rows
             + r"""\end{longtable}

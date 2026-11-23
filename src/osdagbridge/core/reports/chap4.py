@@ -75,6 +75,38 @@ def ch4_analysis(asum, fig_paths, bridge: "ReportDataBridge", span_m: float):
     _allow_total_str = f"L/600 = {_allow_total_mm:.1f} mm"
     _live_status     = ("PASS" if _live_mm  <= _allow_live_mm  else r"\textcolor{red}{FAIL}") if _live_mm  is not None else "---"
     _total_status    = ("PASS" if _total_mm <= _allow_total_mm else r"\textcolor{red}{FAIL}") if _total_mm is not None else "---"
+
+    rxn_rows = []
+    for lc, rdata in rxn_summary.items():
+        if isinstance(rdata, dict):
+            l_val = _fmt(rdata.get('left_kN'))
+            r_val = _fmt(rdata.get('right_kN'))
+            if l_val != "---" or r_val != "---":
+                rxn_rows.append(f"{_tex(lc)} & {l_val} & {r_val} \\\\[6pt]\n\\hline")
+
+    if rxn_rows:
+        rxn_table_tex = r"""
+\vspace{1em}
+\begin{longtable}{|>{\centering\arraybackslash}p{5.2cm}|>{\centering\arraybackslash}p{5.2cm}|>{\centering\arraybackslash}p{5.2cm}|}
+\caption{\textbf{Reactions at Supports}} \\
+\hline
+\textbf{Load Case} & \textbf{Left Support (kN)} & \textbf{Right Support (kN)} \\[6pt]
+\hline
+\endfirsthead
+\multicolumn{3}{l}{\small\textit{Reactions at Supports (continued)}} \\
+\hline
+\textbf{Load Case} & \textbf{Left Support (kN)} & \textbf{Right Support (kN)} \\[6pt]
+\hline
+\endhead
+""" + "\n".join(rxn_rows) + r"""
+\end{longtable}
+"""
+    else:
+        rxn_table_tex = r"""
+\vspace{0.8em}
+\noindent\textit{Support reactions for all load cases are summarized in Table 4.1.}
+\vspace{0.8em}
+"""
     return r"""
 \chapter{Analysis Results}
 
@@ -139,21 +171,7 @@ A grillage model was used for structural analysis. The deck is idealized as a gr
 \hline
 \end{longtable}
 \endgroup
-
-\vspace{1em}
-\begin{longtable}{|>{\centering\arraybackslash}p{5.2cm}|>{\centering\arraybackslash}p{5.2cm}|>{\centering\arraybackslash}p{5.2cm}|}
-\caption{\textbf{Reactions at Supports}}
-\hline
-\textbf{Load Case} & \textbf{Left Support (kN)} & \textbf{Right Support (kN)} \\[6pt]
-\hline
- & """ + '' + r""" & """ + '' + r""" \\[6pt]
-\hline
- & """ + '' + r""" & """ + '' + r""" \\[6pt]
-\hline
- & """ + '' + r""" & """ + '' + r""" \\[6pt]
-\hline
-\end{longtable}
-
+""" + rxn_table_tex + r"""
 \vspace{1em}
 \begin{longtable}{|L{7cm}|p{8.5cm}|}
 \caption{\textbf{Deflection Summary (Live Load \& Total Load)}}

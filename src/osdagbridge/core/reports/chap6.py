@@ -144,6 +144,7 @@ This section presents CAD-generated views of the designed bridge and its compone
             + gxsec + '\n\n'
             + gside + r"""
 
+\FloatBarrier
 \section{Cross Bracing Detail}
 \label{sec:bracing-detail}
 
@@ -151,7 +152,7 @@ This section presents CAD-generated views of the designed bridge and its compone
             + cbdia + '\n\n'
             + cb_sections_row + r"""
             
-
+\FloatBarrier
 \section{End Diaphragm Detail}
 \label{sec:diaphragm-detail}
 
