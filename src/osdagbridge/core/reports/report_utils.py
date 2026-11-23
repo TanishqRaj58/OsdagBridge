@@ -1,3 +1,4 @@
+import re
 from osdagbridge.core.utils.common import (
     KEY_MP_GD_MEMBER_ID,
     KEY_MP_GD_SELECT_GIRDER,
@@ -39,20 +40,20 @@ def _render_value(source_dict, key, unit=""):
 
 
 def _format_lc(lc: str) -> str:
-    """Format load combo avoiding awkward mid-word breaks while allowing break at underscores."""
+    """Format load combo so long expressions wrap naturally inside narrow table columns."""
     s = str(lc).strip() if lc is not None else ""
     if not s or s == "---":
         return "---"
-    parts = s.split("_")
-    escaped_parts = []
-    for p in parts:
-        esc_p = _tex(p)
-        if esc_p:
-            escaped_parts.append(r"\mbox{" + esc_p + r"}")
-        else:
-            escaped_parts.append("")
-    return r"\_\allowbreak{}".join(escaped_parts)
 
+    # Normalize existing line breaks or spacing so long strings can wrap cleanly
+    s = s.replace("\r\n", " ").replace("\n", " ")
+    s = re.sub(r"\s+", " ", s).strip()
+
+    # Escape with _tex first, then allow clean line breaks after underscores, colons, and +/-
+    formatted = _tex(s)
+    formatted = formatted.replace(" + ", " \\allowbreak + ")
+    formatted = formatted.replace(" - ", " \\allowbreak - ")
+    return formatted
 
 
 def get_girder_entries(input_dict):

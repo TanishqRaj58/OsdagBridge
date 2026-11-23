@@ -1,3 +1,4 @@
+import re
 from typing import TYPE_CHECKING
 from osdagbridge.core.utils.common import (
     KEY_SPAN,
@@ -10,84 +11,142 @@ from osdagbridge.core.reports.report_utils import _tex, _format_lc, _fig_embed
 if TYPE_CHECKING:
     from .report_generator import ReportDataBridge
 
+
+def _wrap_lc_text(lc: str, max_chars: int = 22) -> str:
+    """Force clean multi-line wrapping for load combinations inside narrow table columns."""
+    raw = str(lc or "").strip()
+    formatted = _format_lc(raw)
+
+    # Normalize non-breaking spaces, line breaks, and box wrappers into normal spaces
+    formatted = formatted.replace("~", " ")
+    formatted = re.sub(r"\\\\\*?|\\newline\b|\\linebreak\b|\\par\b", " ", formatted)
+    formatted = re.sub(r"\\(?:mbox|hbox|makebox|fbox)\{([^{}]*)\}", r"\1", formatted)
+    formatted = re.sub(r"\s+", " ", formatted).strip()
+
+    # Break after ':' if followed by combination terms, and wrap long '+' / '-' chains
+    if ":" in formatted:
+        prefix, rest = formatted.split(":", 1)
+        rest = rest.strip()
+        if len(rest) > max_chars:
+            # Split long load factor strings at '+' or '-' every ~max_chars characters
+            parts = re.split(r"(\s*(?:\+|-)\s*)", rest)
+            lines = []
+            current = ""
+            for token in parts:
+                if not token:
+                    continue
+                if current and len(current) + len(token) > max_chars:
+                    lines.append(current.strip())
+                    current = token.lstrip()
+                else:
+                    current += token
+            if current.strip():
+                lines.append(current.strip())
+            return prefix.strip() + r":\newline " + r"\newline ".join(lines)
+
+    return formatted
+
+
+def _to_float(val):
+    if val is None:
+        return None
+    if isinstance(val, (int, float)):
+        return float(val)
+    match = re.search(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", str(val))
+    return float(match.group(0)) if match else None
+
+
 def ch4_analysis(asum, fig_paths, bridge: "ReportDataBridge", span_m: float):
-    lc_summary  = (asum or {}).get('load_cases', {})
-    rxn_summary = (asum or {}).get('reactions',  {})
+    lc_summary = (asum or {}).get("load_cases", {})
+    rxn_summary = (asum or {}).get("reactions", {})
 
     def _is_moving(lc_name: str) -> bool:
-        n = lc_name.lower()
+        n = str(lc_name).lower()
         return "moving" in n or " pos_" in n
 
-    lc_summary  = {k: v for k, v in lc_summary.items()  if not _is_moving(k)}
+    lc_summary = {k: v for k, v in lc_summary.items() if not _is_moving(k)}
     rxn_summary = {k: v for k, v in rxn_summary.items() if not _is_moving(k)}
 
     def _fmt(val, nd=3):
-        try:
-            return f"{float(val):.{nd}f}"
-        except (TypeError, ValueError):
-            return r"---"
+        num = _to_float(val)
+        return f"{num:.{nd}f}" if num is not None else r"---"
 
     def _merged_row(lc, bm_d, rxn_d):
-        bm_d  = bm_d  or {}
+        bm_d = bm_d or {}
         rxn_d = rxn_d or {}
         return (
-            _format_lc(lc)                        + r" & "
-            + _fmt(bm_d.get('max_bm'))           + r" & "
-            + _tex(bm_d.get('bm_girder', '---')) + r" & "
-            + _fmt(bm_d.get('bm_location'))      + r" & "
-            + _fmt(bm_d.get('max_sf'))           + r" & "
-            + _tex(bm_d.get('sf_girder', '---')) + r" & "
-            + _fmt(bm_d.get('sf_location'))      + r" & "
-            + _fmt(rxn_d.get('left_kN'))         + r" & "
-            + _fmt(rxn_d.get('right_kN'))        + r" \\[6pt]"
+            _wrap_lc_text(lc) + r" & "
+            + _fmt(bm_d.get("max_bm")) + r" & "
+            + _tex(bm_d.get("bm_girder", "---")) + r" & "
+            + _fmt(bm_d.get("bm_location")) + r" & "
+            + _fmt(bm_d.get("max_sf")) + r" & "
+            + _tex(bm_d.get("sf_girder", "---")) + r" & "
+            + _fmt(bm_d.get("sf_location")) + r" & "
+            + _fmt(rxn_d.get("left_kN")) + r" & "
+            + _fmt(rxn_d.get("right_kN")) + r" \\[6pt]"
         )
 
     all_lcs = list(lc_summary.keys()) + [k for k in rxn_summary if k not in lc_summary]
 
-    merged_body = ("\n\\hline\n").join(
-        _merged_row(lc, lc_summary.get(lc), rxn_summary.get(lc))
-        for lc in all_lcs
-    ) if all_lcs else r"--- & --- & --- & --- & --- & --- & --- & --- & --- \\[6pt]"
+    merged_body = (
+        "\n\\hline\n".join(
+            _merged_row(lc, lc_summary.get(lc), rxn_summary.get(lc))
+            for lc in all_lcs
+        )
+        if all_lcs
+        else r"--- & --- & --- & --- & --- & --- & --- & --- & --- \\[6pt]"
+    )
 
-    _span_m         = float(bridge.input_dict.get(KEY_SPAN, 0) or 0)
-    _allow_live_mm  = _span_m * 1000.0 / 800.0
+    _span_m = _to_float(bridge.input_dict.get(KEY_SPAN)) or _to_float(span_m) or 0.0
+    _allow_live_mm = _span_m * 1000.0 / 800.0
     _allow_total_mm = _span_m * 1000.0 / 600.0
 
     # Find governing girder — worst (max) deflection across all girders
-    try:
-        n = int(bridge.input_dict.get(KEY_TS_NO_OF_GIRDERS, 1) or 1)
-    except (TypeError, ValueError):
-        n = 1
+    n_val = _to_float(bridge.input_dict.get(KEY_TS_NO_OF_GIRDERS))
+    n = max(1, int(n_val)) if n_val is not None else 1
 
-    _live_mm  = None
+    _live_mm = None
     _total_mm = None
     for _gi in range(1, n + 1):
-        _l = bridge.output_dict.get(f"{KEY_SD_DEFL_LIVE}.G{_gi}")
-        _t = bridge.output_dict.get(f"{KEY_SD_DEFL_TOTAL}.G{_gi}")
+        _l = _to_float(bridge.output_dict.get(f"{KEY_SD_DEFL_LIVE}.G{_gi}"))
+        _t = _to_float(bridge.output_dict.get(f"{KEY_SD_DEFL_TOTAL}.G{_gi}"))
         if _l is not None:
-            _live_mm  = max(_live_mm, float(_l))  if _live_mm  is not None else float(_l)
+            _live_mm = max(_live_mm, _l) if _live_mm is not None else _l
         if _t is not None:
-            _total_mm = max(_total_mm, float(_t)) if _total_mm is not None else float(_t)
+            _total_mm = max(_total_mm, _t) if _total_mm is not None else _t
 
-    _live_str        = f"{_live_mm:.3f} mm"  if _live_mm  is not None else "---"
-    _total_str       = f"{_total_mm:.3f} mm" if _total_mm is not None else "---"
-    _allow_live_str  = f"L/800 = {_allow_live_mm:.1f} mm"
+    _live_str = f"{_live_mm:.3f} mm" if _live_mm is not None else "---"
+    _total_str = f"{_total_mm:.3f} mm" if _total_mm is not None else "---"
+    _allow_live_str = f"L/800 = {_allow_live_mm:.1f} mm"
     _allow_total_str = f"L/600 = {_allow_total_mm:.1f} mm"
-    _live_status     = ("PASS" if _live_mm  <= _allow_live_mm  else r"\textcolor{red}{FAIL}") if _live_mm  is not None else "---"
-    _total_status    = ("PASS" if _total_mm <= _allow_total_mm else r"\textcolor{red}{FAIL}") if _total_mm is not None else "---"
+    _live_status = (
+        ("PASS" if _live_mm <= _allow_live_mm else r"\textcolor{red}{FAIL}")
+        if _live_mm is not None
+        else "---"
+    )
+    _total_status = (
+        ("PASS" if _total_mm <= _allow_total_mm else r"\textcolor{red}{FAIL}")
+        if _total_mm is not None
+        else "---"
+    )
 
     rxn_rows = []
     for lc, rdata in rxn_summary.items():
         if isinstance(rdata, dict):
-            l_val = _fmt(rdata.get('left_kN'))
-            r_val = _fmt(rdata.get('right_kN'))
+            l_val = _fmt(rdata.get("left_kN"))
+            r_val = _fmt(rdata.get("right_kN"))
             if l_val != "---" or r_val != "---":
-                rxn_rows.append(f"{_format_lc(lc)} & {l_val} & {r_val} \\\\[6pt]\n\\hline")
+                rxn_rows.append(f"{_wrap_lc_text(lc)} & {l_val} & {r_val} \\\\[6pt]\n\\hline")
 
     if rxn_rows:
-        rxn_table_tex = r"""
+        rxn_table_tex = (
+            r"""
 \vspace{1em}
-\begin{longtable}{|>{\centering\arraybackslash}p{5.2cm}|>{\centering\arraybackslash}p{5.2cm}|>{\centering\arraybackslash}p{5.2cm}|}
+\begingroup
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{|>{\raggedright\arraybackslash}p{6.6cm}|>{\centering\arraybackslash}p{4.5cm}|>{\centering\arraybackslash}p{4.5cm}|}
 \caption{\textbf{Reactions at Supports}} \\
 \hline
 \textbf{Load Case} & \textbf{Left Support (kN)} & \textbf{Right Support (kN)} \\[6pt]
@@ -98,16 +157,22 @@ def ch4_analysis(asum, fig_paths, bridge: "ReportDataBridge", span_m: float):
 \textbf{Load Case} & \textbf{Left Support (kN)} & \textbf{Right Support (kN)} \\[6pt]
 \hline
 \endhead
-""" + "\n".join(rxn_rows) + r"""
-\end{longtable}
 """
+            + "\n".join(rxn_rows)
+            + r"""
+\end{longtable}
+\endgroup
+"""
+        )
     else:
         rxn_table_tex = r"""
 \vspace{0.8em}
 \noindent\textit{Support reactions for all load cases are summarized in Table 4.1.}
 \vspace{0.8em}
 """
-    return r"""
+
+    return (
+        r"""
 \chapter{Analysis Results}
 
 A grillage model was used for structural analysis. The deck is idealized as a grid of elastic beam elements --- longitudinal members represent the composite steel girders with effective slab, and transverse members represent the slab or cross frames. This section summarizes the critical output from that analysis.
@@ -119,22 +184,22 @@ A grillage model was used for structural analysis. The deck is idealized as a gr
 \renewcommand{\arraystretch}{1.25}
 
 \begin{longtable}{|
->{\centering\arraybackslash}p{3.1cm}|
->{\centering\arraybackslash}p{1.7cm}|
->{\centering\arraybackslash}p{1.2cm}|
->{\centering\arraybackslash}p{1.3cm}|
->{\centering\arraybackslash}p{1.7cm}|
->{\centering\arraybackslash}p{1.2cm}|
->{\centering\arraybackslash}p{1.3cm}|
+>{\raggedright\arraybackslash}p{3.4cm}|
 >{\centering\arraybackslash}p{1.6cm}|
->{\centering\arraybackslash}p{1.6cm}|}
+>{\centering\arraybackslash}p{1.15cm}|
+>{\centering\arraybackslash}p{1.25cm}|
+>{\centering\arraybackslash}p{1.6cm}|
+>{\centering\arraybackslash}p{1.15cm}|
+>{\centering\arraybackslash}p{1.25cm}|
+>{\centering\arraybackslash}p{1.55cm}|
+>{\centering\arraybackslash}p{1.55cm}|}
 
-\caption{\textbf{Summary of Maximum Demands}}\\
+\caption{\textbf{Summary of Maximum Demands}} \\
 \hline
 \multirow{2}{*}{\makecell{\textbf{Load}\\\textbf{Case/}\\\textbf{Comb.}}}
 & \multicolumn{3}{c|}{\textbf{Bending Moment}}
 & \multicolumn{3}{c|}{\textbf{Shear Force}}
-& \multicolumn{2}{c|}{\textbf{Reaction at Supports}}\\
+& \multicolumn{2}{c|}{\textbf{Reaction at Supports}} \\
 \cline{2-9}
 
 & \makecell{\textbf{Max}\\\textbf{(kNm)}}
@@ -144,7 +209,7 @@ A grillage model was used for structural analysis. The deck is idealized as a gr
 & \textbf{Girder}
 & \makecell{\textbf{Loc.}\\\textbf{(m)}}
 & \makecell{\textbf{Left}}
-& \makecell{\textbf{Right }}\\
+& \makecell{\textbf{Right}} \\
 \hline
 \endfirsthead
 
@@ -152,7 +217,7 @@ A grillage model was used for structural analysis. The deck is idealized as a gr
 \multirow{2}{*}{\makecell{\textbf{Load}\\\textbf{Case/}\\\textbf{Comb.}}}
 & \multicolumn{3}{c|}{\textbf{Bending Moment}}
 & \multicolumn{3}{c|}{\textbf{Shear Force}}
-& \multicolumn{2}{c|}{\textbf{Reaction at Supports}}\\
+& \multicolumn{2}{c|}{\textbf{Reaction at Supports}} \\
 \cline{2-9}
 
 & \makecell{\textbf{Max}\\\textbf{(kNm)}}
@@ -162,40 +227,75 @@ A grillage model was used for structural analysis. The deck is idealized as a gr
 & \textbf{Girder}
 & \makecell{\textbf{Loc.}\\\textbf{(m)}}
 & \makecell{\textbf{Left}}
-& \makecell{\textbf{Right}}\\
+& \makecell{\textbf{Right}} \\
 \hline
 \endhead
 
-""" + merged_body + r"""
+"""
+        + merged_body
+        + r"""
 
 \hline
 \end{longtable}
 \endgroup
-""" + rxn_table_tex + r"""
+"""
+        + rxn_table_tex
+        + r"""
 \vspace{1em}
+\IfFileExists{needspace.sty}{\needspace{7\baselineskip}}{}
 \begin{longtable}{|L{7cm}|p{8.5cm}|}
-\caption{\textbf{Deflection Summary (Live Load \& Total Load)}}
+\caption{\textbf{Deflection Summary (Live Load \& Total Load)}} \\
 \hline
 \textbf{parameter} & \textbf{value} \\
 \hline
-\textnormal{Deflection due to Live Load, $\delta_{LL}$} & """ + _live_str + r""" \\[6pt]
+\textnormal{Deflection due to Live Load, $\delta_{LL}$} & """
+        + _live_str
+        + r""" \\[6pt]
 \hline
-\textnormal{Allowable Live Load Deflection ($\Delta_{allow}$)} & """ + _allow_live_str + r""" \\[6pt]
+\textnormal{Allowable Live Load Deflection ($\Delta_{allow}$)} & """
+        + _allow_live_str
+        + r""" \\[6pt]
 \hline
-\textnormal{Live Load Deflection Check Status} & """ + _live_status + r""" \\[6pt]
+\textnormal{Live Load Deflection Check Status} & """
+        + _live_status
+        + r""" \\[6pt]
 \hline
-\textnormal{Deflection due to Total Load, $\delta_{total}$} & """ + _total_str + r""" \\[6pt]
+\textnormal{Deflection due to Total Load, $\delta_{total}$} & """
+        + _total_str
+        + r""" \\[6pt]
 \hline
-\textnormal{Allowable Total Deflection ($\Delta_{allow}$)} & """ + _allow_total_str + r""" \\[6pt]
+\textnormal{Allowable Total Deflection ($\Delta_{allow}$)} & """
+        + _allow_total_str
+        + r""" \\[6pt]
 \hline
-\textnormal{Total Load Deflection Check Status} & """ + _total_status + r""" \\[6pt]
+\textnormal{Total Load Deflection Check Status} & """
+        + _total_status
+        + r""" \\[6pt]
 \hline
 \end{longtable}
 
 \vspace{1em}
 \noindent
-""" + _fig_embed(fig_paths.get('bm_envelope'), 'Bending Moment Envelope (Envelope ULS): Max/min BM along span. X-axis: distance from left support (m). Y-axis: Bending Moment (kN-m).', width=r'0.75\textwidth') + r"""
-""" + _fig_embed(fig_paths.get('sf_envelope'), 'Shear Force Envelope (Envelope ULS): Max/min SF along span. X-axis: distance from left support (m). Y-axis: Shear Force (kN).', width=r'0.75\textwidth') + r"""
-""" + _fig_embed(fig_paths.get('defl_ll'), 'Vertical Deflection D$_y$ (1.0 LL): Maximum deflection along span. Load Case: 1.0 LL, Combination: $D_y$. Nodes shown. Isometric view.', width=r'0.75\textwidth') + r"""
 """
-
+        + _fig_embed(
+            fig_paths.get("bm_envelope"),
+            "Bending Moment Envelope (Envelope ULS): Max/min BM along span. X-axis: distance from left support (m). Y-axis: Bending Moment (kN-m).",
+            width=r"0.75\textwidth",
+        )
+        + r"""
+"""
+        + _fig_embed(
+            fig_paths.get("sf_envelope"),
+            "Shear Force Envelope (Envelope ULS): Max/min SF along span. X-axis: distance from left support (m). Y-axis: Shear Force (kN).",
+            width=r"0.75\textwidth",
+        )
+        + r"""
+"""
+        + _fig_embed(
+            fig_paths.get("defl_ll"),
+            "Vertical Deflection D$_y$ (1.0 LL): Maximum deflection along span. Load Case: 1.0 LL, Combination: $D_y$. Nodes shown. Isometric view.",
+            width=r"0.75\textwidth",
+        )
+        + r"""
+"""
+    )

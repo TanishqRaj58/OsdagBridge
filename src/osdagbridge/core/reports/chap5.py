@@ -151,6 +151,17 @@ if TYPE_CHECKING:
     pass
 
 
+def _wrap_combo(formatted_str: str) -> str:
+    """Insert safe LaTeX line-break points in long load combinations without regex escapes."""
+    s = str(formatted_str or "").replace("~", " ").strip()
+    if not s or s == "---":
+        return s
+    s = s.replace(": ", ":\\hspace{0pt} ")
+    s = s.replace(" + ", " \\hspace{0pt}+ ")
+    s = s.replace(" - ", " \\hspace{0pt}- ")
+    return s
+
+
 def _multirow_group(count: int, label: str, subrows: list[str], cline_range: str) -> str:
     """Place the girder label on the first row without \\multirow so it never bleeds into the footer."""
     if not subrows:
@@ -499,7 +510,7 @@ def ch5_design_checks(checks_data, bridge, fig_paths: Optional[dict] = None) -> 
             ctrl_lc = (g_data.get("demand") or {}).get("governing_combination") or "---"
 
         g_summary_rows.append(
-            _tex(lbl) + r" & " + _tex(str(ctrl_lc)) + r" & " + _tex(str(ctrl.get("name", "---")))
+            _tex(lbl) + r" & " + _wrap_combo(_tex(str(ctrl_lc))) + r" & " + _tex(str(ctrl.get("name", "---")))
             + r" & " + _with_unit(ctrl.get("demand"), ctrl.get("demand_unit"))
             + r" & " + _with_unit(ctrl.get("capacity"), ctrl.get("capacity_unit"))
             + r" & " + _dfmt(ctrl.get("dcr"), nd=3)
@@ -670,7 +681,7 @@ def ch5_design_checks(checks_data, bridge, fig_paths: Optional[dict] = None) -> 
         for member, label in [("diagonal", "Diagonal"), ("chord", "Chord")]:
             force_str, ftype = bridge.get_cb_governing_force(pair, member)
             section = bridge.get_cb_section(pair, member, ftype) or "---"
-            gov_lc = bridge.get_cb_gov_lc(pair, member, ftype) or "---"
+            gov_lc = _wrap_combo(_tex(bridge.get_cb_gov_lc(pair, member, ftype) or "---"))
             capacity = bridge.get_cb_capacity(pair, member, ftype) or "---"
             ur = bridge.get_cb_efficiency(pair, member, ftype) or "---"
             status = bridge.get_cb_status(pair, member, ftype) or "---"
@@ -759,7 +770,7 @@ def ch5_design_checks(checks_data, bridge, fig_paths: Optional[dict] = None) -> 
         return (r"\textcolor{red}{" + s + "}") if f > 1.0 else s
 
     def _lc_short(lc):
-        return _format_lc(str(lc).strip())
+        return _wrap_combo(_format_lc(str(lc).strip()))
 
     def _gov_lc_in_522(g, check_ids):
         gd = _pg_522.get(g) or {}
@@ -838,7 +849,7 @@ def ch5_design_checks(checks_data, bridge, fig_paths: Optional[dict] = None) -> 
         if best is None:
             return ("---", "---", "---", "---")
         ur, _, _, cap = best
-        gov = _format_lc(bridge.get_cb_gov_lc(best[1], best[2], force_type) or "---")
+        gov = _wrap_combo(_format_lc(bridge.get_cb_gov_lc(best[1], best[2], force_type) or "---"))
         dem = f"{float(cap) * ur:.2f} kN" if cap else "---"
         cap_s = (cap + " kN") if cap else "---"
         return (gov, dem, cap_s, _ur_522(ur, category_key))
@@ -910,7 +921,7 @@ def ch5_design_checks(checks_data, bridge, fig_paths: Optional[dict] = None) -> 
                 _d = _ld.get("max_dcr") or 0.0
                 if best is None or _d > best[0]:
                     best = (_d, _lc)
-        return _tex(str(best[1]).strip()) if best else "Frequent SLS"
+        return _wrap_combo(_tex(str(best[1]).strip())) if best else "Frequent SLS"
 
     _wk_lim = _dkv(KEY_DD_WK_LIMIT)
     _crack_cells = (
